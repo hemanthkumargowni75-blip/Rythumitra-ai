@@ -59,7 +59,8 @@ export function FarmProvider({ children }: { children: React.ReactNode }) {
   const [farm, setFarmState] = useState<Farm>(initialFarm);
   const [soilTest, setSoilTestState] = useState<SoilTestRecord>(initialSoilTest);
   const [activeCrop, setActiveCropState] = useState<ActiveCrop>(initialActiveCrop);
-  const [weatherForecast] = useState<WeatherDay[]>(initialWeatherForecast);
+  const [weatherForecast, setWeatherForecast] = useState<WeatherDay[]>(initialWeatherForecast);
+
   const [consultations, setConsultationsState] = useState<ConsultationTicket[]>(initialConsultations);
   const [fieldVisits, setFieldVisitsState] = useState<FieldVisitBooking[]>(initialFieldVisits);
   const [treatmentTasks, setTreatmentTasksState] = useState<TreatmentTask[]>(initialTreatmentTasks);
@@ -110,6 +111,23 @@ export function FarmProvider({ children }: { children: React.ReactNode }) {
       // Ignore JSON parse errors and stick to initial defaults
     }
   }, []);
+
+  // Fetch live agro-weather based on farm coordinates
+  useEffect(() => {
+    const lat = farm.centerLocation?.lat || 16.4245;
+    const lng = farm.centerLocation?.lng || 80.4548;
+    fetch(`/api/v1/weather?lat=${lat}&lon=${lng}&farmName=${encodeURIComponent(farm.name)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.forecast) && data.forecast.length > 0) {
+          setWeatherForecast(data.forecast);
+        }
+      })
+      .catch((err) => {
+        console.warn('Live weather fetch warning:', err);
+      });
+  }, [farm.centerLocation?.lat, farm.centerLocation?.lng, farm.name]);
+
 
   const setFarmer = (f: FarmerProfile) => {
     setFarmerState(f);
