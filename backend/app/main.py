@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas import (
@@ -20,10 +21,13 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Enable CORS for Next.js web application
+# Configure CORS using FRONTEND_ORIGIN
+allowed_origins_env = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins if allowed_origins else ["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +41,14 @@ def health_check():
         service="RythuMitra AI Geospatial Microservice",
         geospatial_engine="PostGIS / Shapely / Haversine Active",
     )
+
+@app.get("/readiness")
+def readiness_check():
+    return {
+        "status": "READY",
+        "service": "RythuMitra AI Geospatial Microservice",
+        "timestamp": os.getenv("RENDER_GIT_COMMIT", "local-build"),
+    }
 
 @app.post("/api/v1/geo/geofence", response_model=GeofenceVerificationResponse)
 def verify_geofence(req: GeofenceVerificationRequest):

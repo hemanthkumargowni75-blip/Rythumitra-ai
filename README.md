@@ -373,6 +373,58 @@ node scratch/test_password_otp_flows.js
 
 ---
 
+## 🌐 Deployment
+
+### Vercel (Primary Web & API Deployment)
+RythuMitra AI is self-contained within the Next.js 14 full-stack architecture, allowing complete deployment on Vercel:
+
+```text
+GitHub Repository (main)
+        ↓ (Automatic CI/CD Deployment)
+Vercel Edge & Serverless Platform
+        ↓
+Next.js 14 Web Application & API Routes (/api/v1/*, /api/health)
+```
+
+1. **Import Project**: In Vercel, click **Add New → Project** and import `hemanthkumargowni75-blip/rythumitra-ai`.
+2. **Preset**: Select **Next.js** (automatically detected).
+3. **Build Settings**:
+   - Build Command: `next build`
+   - Output Directory: `.next`
+   - Install Command: `npm install`
+4. **Environment Variables**: Configure server-side credentials in **Settings → Environment Variables** (do not expose secrets with `NEXT_PUBLIC_` prefix).
+
+### Render (Auxiliary Backend Microservice — Optional)
+The Python/FastAPI geospatial microservice in `backend/` is available as an auxiliary service and configured via `render.yaml`:
+
+```text
+GitHub Repository (main)
+        ↓
+Render Web Service (Oregon / Python 3.11)
+        ↓
+FastAPI Microservice (backend/app/main.py on 0.0.0.0:$PORT)
+```
+- **Build Command**: `pip install --upgrade pip && pip install -r requirements.txt`
+- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/health`
+- **CORS Config**: Set `FRONTEND_ORIGIN` to your Vercel production domain.
+
+---
+
+## ✅ Production Deployment Checklist
+- [x] **GitHub**: Source repository configured on `main` branch.
+- [x] **Vercel Readiness**: Next.js 14 production build verified (`npm run build` succeeds).
+- [x] **Deployment Health**: `/api/health` endpoint operational.
+- [x] **Zero Hardcoded Secrets**: Scanned and verified across all tracked files.
+- [x] **CORS**: `FRONTEND_ORIGIN` parameter configured for FastAPI backend.
+- [ ] **External Database**: Connect production PostgreSQL / PostGIS via `DATABASE_URL` (critical: local JSON `data/*.db.json` is not persistent across Vercel serverless functions).
+- [ ] **Persistent Object Storage**: Configure S3 / cloud bucket for farmer crop photos.
+- [ ] **2Factor SMS Credentials**: `TWOFACTOR_API_KEY` set in Vercel project settings.
+- [ ] **Google Gemini AI Credentials**: `GEMINI_API_KEY` set in Vercel project settings.
+- [ ] **HTTPS / Custom Domain**: SSL/TLS certificate enabled (required for WebRTC camera, speech recognition, and GPS).
+
+---
+
 ## 📌 Project Status
 
 **Current Status**: `Production Candidate (v1.0.0-rc1)`
