@@ -141,8 +141,9 @@ export async function sendSecureOTP(
     };
   }
 
-  // Check resend cooldown for active challenge of the SAME purpose on this phone
+  // Check resend cooldown / duplicate submissions for active challenge of the SAME purpose on this phone
   const now = Date.now();
+  let duplicateRecentChallenge: OTPChallenge | undefined;
   let cooldownError: string | null = null;
   let cooldownChallengeId: string | undefined;
 
@@ -150,14 +151,33 @@ export async function sendSecureOTP(
     if (
       challenge.phone === cleanPhone &&
       challenge.purpose === purpose &&
-      !challenge.verified &&
-      now < challenge.resendAvailableAt
+      !challenge.verified
     ) {
-      const waitSec = Math.ceil((challenge.resendAvailableAt - now) / 1000);
-      cooldownError = `Please wait ${waitSec} seconds before requesting a new OTP.`;
-      cooldownChallengeId = challenge.challengeId;
+      if (now - challenge.createdAt < 10000) {
+        // Request deduplication window: if an identical active challenge was created < 10s ago,
+        // return existing challenge to prevent double-clicks from causing user-facing failure
+        duplicateRecentChallenge = challenge;
+      } else if (now < challenge.resendAvailableAt) {
+        const waitSec = Math.ceil((challenge.resendAvailableAt - now) / 1000);
+        cooldownError = `Please wait ${waitSec} seconds before requesting a new OTP.`;
+        cooldownChallengeId = challenge.challengeId;
+      }
     }
   });
+
+  if (duplicateRecentChallenge) {
+    const phoneMasked = `+91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`;
+    const smsProvider = getSMSProvider();
+    return {
+      success: true,
+      challengeId: duplicateRecentChallenge.challengeId,
+      expiresInSeconds: Math.max(1, Math.floor((duplicateRecentChallenge.expiresAt - now) / 1000)),
+      resendCooldownSeconds: Math.max(1, Math.ceil((duplicateRecentChallenge.resendAvailableAt - now) / 1000)),
+      phoneMasked,
+      providerConfigured: smsProvider.isConfigured(),
+      providerName: smsProvider.name,
+    };
+  }
 
   if (cooldownError) {
     return {

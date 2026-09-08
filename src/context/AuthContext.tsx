@@ -109,13 +109,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
       setIsLoading(false);
 
       if (!res.ok || !data.success) {
+        let errorMsg = data.error;
+        if (!errorMsg) {
+          if (res.status === 401) {
+            errorMsg = 'Invalid mobile number or password.';
+          } else if (res.status === 429) {
+            errorMsg = 'Too many OTP requests. Please wait a few minutes before trying again.';
+          } else if (res.status === 503) {
+            errorMsg = 'SMS OTP service is temporarily unavailable. Please try again later.';
+          } else if (res.status === 400) {
+            errorMsg = 'Unable to request verification code. Please check your details.';
+          } else {
+            errorMsg = 'An unexpected error occurred while processing login. Please try again.';
+          }
+        }
         return {
           success: false,
-          error: data.error || 'Invalid mobile number or password.',
+          error: errorMsg,
         };
       }
 

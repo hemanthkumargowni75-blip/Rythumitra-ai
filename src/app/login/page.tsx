@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -41,11 +41,25 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+
+  // Concurrency locks to prevent duplicate submissions / race conditions
+  const isSubmittingRef = useRef(false);
+  const isVerifyingRef = useRef(false);
+
+  // Clean stale error banner whenever transitioning to 2FA verification screen
+  useEffect(() => {
+    if (is2FAPending) {
+      if (statusMessage?.type === 'error') {
+        setStatusMessage(null);
+      }
+    }
+  }, [is2FAPending]);
 
   // Step 1: Submit Mobile & Password -> Validate Credentials & Send OTP
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || loading) return;
+
     setStatusMessage(null);
 
     const norm = normalizeIndianMobile(phone);
@@ -59,49 +73,98 @@ export default function LoginPage() {
       return;
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
 
-    // Call 2-step login: Password alone NEVER logs in
-    const res = await login(cleanPhone, password, language);
-    setLoading(false);
+    try {
+      // Call 2-step login: Password alone NEVER logs in
+      const res = await login(cleanPhone, password, language);
 
-    if (res.success && res.requires2FA) {
-      setOtpValue('');
-      setStatusMessage({
-        type: 'success',
-        text: 'Password verified. Please enter the 6-digit 2Factor OTP sent to your phone.',
-      });
-    } else {
-      setStatusMessage({
-        type: 'error',
-        text: res.error || 'Invalid mobile number or password.',
-      });
+      if (res.success && res.requires2FA) {
+        setOtpValue('');
+        setStatusMessage({
+          type: 'success',
+          text: 'Password verified. Please enter the 6-digit 2Factor OTP sent to your phone.',
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: res.error || 'Unable to sign in. Please check your credentials.',
+        });
+      }
+    } finally {
+      isSubmittingRef.current = false;
+      setLoading(false);
     }
   };
 
   // Step 2: Submit 2Factor OTP -> Final Authentication
   const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpValue.length !== 6) return;
+    if (otpValue.length !== 6 || isVerifyingRef.current || loading) return;
 
+    isVerifyingRef.current = true;
     setStatusMessage(null);
     setLoading(true);
 
-    const res = await verify2FA(otpValue);
-    setLoading(false);
+    try {
+      const res = await verify2FA(otpValue);
 
-    if (res.success) {
-      setStatusMessage({
-        type: 'success',
-        text: 'OTP verified successfully! Redirecting to your dashboard...',
-      });
-      setTimeout(() => router.push('/'), 600);
-    } else {
-      setStatusMessage({
-        type: 'error',
-        text: res.error || 'Invalid OTP code. Please try again.',
-      });
+      if (res.success) {
+        setStatusMessage({
+          type: 'success',
+          text: 'OTP verified successfully! Redirecting to your dashboard...',
+        });
+        setTimeout(() => router.push('/'), 600);
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: res.error || 'Invalid OTP code. Please try again.',
+        });
+      }
+    } finally {
+      isVerifyingRef.current = false;
+      setLoading(false);
     }
+  };
+
+  // Resend OTP handler for Step 2
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || loading || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    setLoading(true);
+    setStatusMessage(null);
+
+    try {
+      const targetPhone = phone || pending2FAPhone || '';
+      const norm = normalizeIndianMobile(targetPhone);
+      const cleanPhone = norm.valid ? norm.normalized : targetPhone.replace(/\D/g, '').slice(-10);
+      const res = await login(cleanPhone, password, language);
+
+      if (res.success) {
+        setOtpValue('');
+        setStatusMessage({
+          type: 'success',
+          text: 'A new 6-digit 2Factor OTP has been sent to your phone.',
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: res.error || 'Failed to resend OTP. Please try again.',
+        });
+      }
+    } finally {
+      isSubmittingRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  // Cancel 2FA and return to Step 1
+  const handleCancel2FA = () => {
+    cancel2FA();
+    setStatusMessage(null);
+    setOtpValue('');
   };
 
   return (
@@ -272,7 +335,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between text-xs pt-1">
                 <button
                   type="button"
-                  onClick={cancel2FA}
+                  onClick={handleCancel2FA}
                   className="text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -281,7 +344,7 @@ export default function LoginPage() {
 
                 <button
                   type="button"
-                  onClick={handlePasswordLogin}
+                  onClick={handleResendOtp}
                   disabled={resendCooldown > 0 || loading}
                   className="font-bold text-emerald-700 hover:text-emerald-800 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-1"
                 >
