@@ -1,37 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Sprout,
-  CloudSun,
-  Droplet,
-  FileText,
-  ShieldAlert,
-  TrendingUp,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  ExternalLink,
   Volume2,
   VolumeX,
-  Calendar,
-  AlertTriangle,
   CheckCircle2,
-  Wind,
-  Thermometer,
-  CloudRain,
-  Activity,
-  Layers,
-  MapPin,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useFarm } from '@/context/FarmContext';
 import { useAuth } from '@/context/AuthContext';
 import { ADVISORY_TRANSLATIONS } from '@/data/advisorySlidesTranslations';
-import { verifiedMandiPrices } from '@/data/marketData';
-import { formatINR } from '@/lib/utils';
+import { generateAdvisorySlides, AdvisorySlideItem } from '@/lib/advisory/slideGenerator';
 
 export function FarmerAdvisoryCarousel() {
   const { language } = useLanguage();
@@ -44,217 +29,58 @@ export function FarmerAdvisoryCarousel() {
   const [isPaused, setIsPaused] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  // Acknowledged government notification IDs stored locally
+  const [acknowledgedNoticeIds, setAcknowledgedNoticeIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('rythumitra_ack_notices');
+        if (saved) {
+          setAcknowledgedNoticeIds(JSON.parse(saved));
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+  }, []);
+
+  const handleAcknowledgeNotice = (noticeId: string) => {
+    setAcknowledgedNoticeIds((prev) => {
+      if (prev.includes(noticeId)) return prev;
+      const updated = [...prev, noticeId];
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('rythumitra_ack_notices', JSON.stringify(updated));
+        } catch {
+          // ignore storage error
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Dynamically generate slides based on authenticated farmer, crop, stage, location, weather & govt notices
+  const slides: AdvisorySlideItem[] = useMemo(() => {
+    return generateAdvisorySlides({
+      user,
+      farmer,
+      farm,
+      activeCrop,
+      soilTest,
+      weatherForecast,
+      language,
+      acknowledgedNoticeIds,
+    });
+  }, [user, farmer, farm, activeCrop, soilTest, weatherForecast, language, acknowledgedNoticeIds]);
+
+  const totalSlides = slides.length || 1;
+  const safeCurrentIndex = Math.min(currentSlide, totalSlides - 1);
+  const current = slides[safeCurrentIndex] || slides[0];
+
   // Touch swipe refs
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
-
-  // Weather data
-  const todayWeather = weatherForecast?.[0] || {
-    tempMax: 34,
-    tempMin: 23,
-    rainProbability: 25,
-    humidity: 65,
-    windSpeedKmh: 14,
-    conditionTe: 'పాక్షిక మేఘావృతం',
-    condition: 'PARTLY_CLOUDY',
-    sprayAdvisory: { canSpray: true },
-  };
-
-  const upcomingRainyDay = weatherForecast?.find((d) => d.rainProbability >= 60);
-
-  // Market price lookup for active crop
-  const cropKeyword = (activeCrop?.cropId || activeCrop?.cropNameEn || 'chilli').toLowerCase();
-  const matchedMandi =
-    verifiedMandiPrices.find((m) => m.cropId.toLowerCase() === cropKeyword) ||
-    verifiedMandiPrices.find((m) => cropKeyword.includes(m.cropId.toLowerCase())) ||
-    verifiedMandiPrices[0];
-
-  const activeCropDisplay =
-    language === 'te'
-      ? activeCrop?.cropNameTe || 'తేజా మిర్చి'
-      : activeCrop?.cropNameEn || 'Chilli (Teja)';
-
-  // Build 7 Slides Data
-  const slides = [
-    // -------------------------------------------------------------
-    // SLIDE 1: CROP ADVISORY
-    // -------------------------------------------------------------
-    {
-      id: 'crop',
-      badge: language === 'te' ? 'నా పంట సలహా' : 'Active Crop',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      icon: Sprout,
-      iconColor: 'text-emerald-400',
-      title: t.cropTitle,
-      subtitle: t.cropSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Farmer inspecting healthy green crop in field',
-      metrics: [
-        { label: t.cropActive, value: activeCropDisplay, highlight: true },
-        { label: t.cropStage, value: activeCrop?.currentStage?.replace(/_/g, ' ') || 'FLOWERING' },
-        { label: t.cropDays, value: `${activeCrop?.stageDays || 58} ${language === 'te' ? 'రోజులు' : 'Days'}` },
-        { label: language === 'te' ? 'విస్తీర్ణం' : 'Acreage', value: `${farm?.boundary?.areaAcres || 4.5} ${language === 'te' ? 'ఎకరాలు' : 'Acres'}` },
-      ],
-      description: t.cropAction,
-      speechText: `${t.cropTitle}. ${activeCropDisplay}, ${t.cropStage}: ${activeCrop?.currentStage}. ${t.cropAction}`,
-      ctaText: t.cropCta,
-      ctaHref: '/crops',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 2: WEATHER ADVISORY
-    // -------------------------------------------------------------
-    {
-      id: 'weather',
-      badge: language === 'te' ? 'వాతావరణ నివేదిక' : 'Live Agro-Weather',
-      badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
-      icon: CloudSun,
-      iconColor: 'text-sky-400',
-      title: t.weatherTitle,
-      subtitle: t.weatherSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Agricultural crop fields under monsoon sky',
-      metrics: [
-        { label: t.weatherTemp, value: `${todayWeather.tempMax}°C / ${todayWeather.tempMin}°C`, highlight: true },
-        { label: t.weatherRain, value: `${todayWeather.rainProbability}%` },
-        { label: t.weatherHumidity, value: `${todayWeather.humidity}%` },
-        { label: t.weatherWind, value: `${todayWeather.windSpeedKmh} km/h` },
-      ],
-      description: todayWeather.sprayAdvisory?.canSpray
-        ? `${t.weatherSprayFavorable}. ${language === 'te' ? 'గాలి వేగం సాధారణంగా ఉంది, ఉదయం మందులు పిచికారీ చేయవచ్చు.' : 'Wind velocity is optimal for morning foliar spray.'}`
-        : `${t.weatherSprayUnfavorable}. ${language === 'te' ? 'గాలి వేగం లేదా వర్ష సూచన వల్ల మందుల పిచికారీ వాయిదా వేయండి.' : 'High wind speed or rain expected. Defer spray operations.'}`,
-      speechText: `${t.weatherTitle}. ${t.weatherTemp}: ${todayWeather.tempMax} డిగ్రీలు. ${t.weatherRain}: ${todayWeather.rainProbability} శాతం. ${todayWeather.sprayAdvisory?.canSpray ? t.weatherSprayFavorable : t.weatherSprayUnfavorable}`,
-      ctaText: t.weatherCta,
-      ctaHref: '/weather',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 3: SMART IRRIGATION
-    // -------------------------------------------------------------
-    {
-      id: 'irrigation',
-      badge: language === 'te' ? 'నీటి పారుదల' : 'Smart Irrigation',
-      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-      icon: Droplet,
-      iconColor: 'text-blue-400',
-      title: t.irrigationTitle,
-      subtitle: t.irrigationSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Fresh irrigation water canal flowing into green farmland',
-      metrics: [
-        { label: t.irrigationMoisture, value: '45% (Optimal)', highlight: true },
-        { label: t.irrigationRuntime, value: upcomingRainyDay ? '0 Hours' : '2 Hours' },
-        { label: t.irrigationMethod, value: farm?.irrigationType?.replace(/_/g, ' ') || 'DRIP' },
-        { label: language === 'te' ? 'భూమి రకం' : 'Soil Type', value: farm?.soilType?.replace(/_/g, ' ') || 'BLACK SOIL' },
-      ],
-      description: upcomingRainyDay ? t.irrigationRainNotice : t.irrigationNormalNotice,
-      speechText: `${t.irrigationTitle}. ${upcomingRainyDay ? t.irrigationRainNotice : t.irrigationNormalNotice}`,
-      ctaText: t.irrigationCta,
-      ctaHref: '/irrigation',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 4: SOIL HEALTH
-    // -------------------------------------------------------------
-    {
-      id: 'soil',
-      badge: language === 'te' ? 'నేల స్వభావం' : 'Soil Health Card',
-      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      icon: FileText,
-      iconColor: 'text-amber-400',
-      title: t.soilTitle,
-      subtitle: t.soilSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Indian farmer hands holding rich fertile agricultural soil',
-      metrics: [
-        { label: t.soilScore, value: `${soilTest?.overallScore || 72}/100`, highlight: true },
-        { label: t.soilPh, value: `${soilTest?.pH || 6.8} (Neutral)` },
-        { label: 'N-P-K', value: `${soilTest?.nitrogen || 210}-${soilTest?.phosphorus || 18}-${soilTest?.potassium || 280}` },
-        { label: 'Zinc (Zn)', value: `${soilTest?.zinc || 0.45} ppm (Low)` },
-      ],
-      description: soilTest?.recommendationsTe?.[0] || t.soilAdvice,
-      speechText: `${t.soilTitle}. ${t.soilScore}: ${soilTest?.overallScore || 72} బై 100. ${soilTest?.recommendationsTe?.[0] || t.soilAdvice}`,
-      ctaText: t.soilCta,
-      ctaHref: '/soil',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 5: PEST & DISEASE ALERT
-    // -------------------------------------------------------------
-    {
-      id: 'pest',
-      badge: language === 'te' ? 'తెగుళ్ల హెచ్చరిక' : 'Pest & Disease Watch',
-      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-      icon: ShieldAlert,
-      iconColor: 'text-rose-400',
-      title: t.pestTitle,
-      subtitle: t.pestSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Agronomist closely inspecting crop plant leaf for early pests',
-      metrics: [
-        { label: t.cropActive, value: activeCropDisplay, highlight: true },
-        { label: t.pestRisk, value: t.pestRiskModerate },
-        { label: language === 'te' ? 'ముప్పు కారకం' : 'Trigger', value: language === 'te' ? 'అధిక తేమ' : 'High Humidity' },
-        { label: language === 'te' ? 'రక్షణ చర్య' : 'Action', value: language === 'te' ? 'జిగురు అట్టలు' : 'Sticky Traps' },
-      ],
-      description: `${t.pestCondition} ${t.pestAction}`,
-      speechText: `${t.pestTitle}. ${activeCropDisplay}. ${t.pestCondition} ${t.pestAction}`,
-      ctaText: t.pestCta,
-      ctaHref: '/diagnostics',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 6: MARKET RATES
-    // -------------------------------------------------------------
-    {
-      id: 'market',
-      badge: 'e-NAM / AGMARKNET',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      icon: TrendingUp,
-      iconColor: 'text-emerald-400',
-      title: t.marketTitle,
-      subtitle: t.marketSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Fresh harvested agricultural produce in crates at market yard',
-      metrics: [
-        { label: t.cropActive, value: matchedMandi.cropNameTe || activeCropDisplay, highlight: true },
-        { label: t.marketModalPrice, value: `${formatINR(matchedMandi.modalPrice)} / Qtl` },
-        { label: t.marketMandi, value: `${matchedMandi.marketName}` },
-        { label: t.marketTrend, value: `${matchedMandi.priceChange24h >= 0 ? `+${matchedMandi.priceChange24h}` : matchedMandi.priceChange24h} (24h)` },
-      ],
-      description: `${language === 'te' ? 'సమీప మండి' : 'Nearest Mandi'}: ${matchedMandi.marketName}, ${matchedMandi.district}. ${t.marketRange}: ${formatINR(matchedMandi.minPrice)} - ${formatINR(matchedMandi.maxPrice)}.`,
-      speechText: `${t.marketTitle}. ${matchedMandi.cropNameTe || activeCropDisplay} మోడల్ ధర ${formatINR(matchedMandi.modalPrice)} రూపాయలు. మార్కెట్: ${matchedMandi.marketName}.`,
-      ctaText: t.marketCta,
-      ctaHref: '/markets',
-    },
-
-    // -------------------------------------------------------------
-    // SLIDE 7: DAILY FARMER TIP
-    // -------------------------------------------------------------
-    {
-      id: 'tip',
-      badge: language === 'te' ? 'రైతు మిత్ర AI సూచన' : 'Agronomist Pro-Tip',
-      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      icon: Sparkles,
-      iconColor: 'text-amber-400',
-      title: t.tipTitle,
-      subtitle: t.tipSubtitle,
-      imageUrl: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=1200&q=80',
-      imageAlt: 'Smiling Indian farmer standing in lush crop farm under clear sunshine',
-      metrics: [
-        { label: t.tipTag, value: language === 'te' ? 'పూత & కాత పెంపు' : 'Flowering & Fruit Setting', highlight: true },
-        { label: language === 'te' ? 'సీజన్' : 'Season', value: language === 'te' ? 'రబీ సీజన్' : 'Rabi Season' },
-        { label: language === 'te' ? 'సిಫార్సు' : 'Method', value: language === 'te' ? 'ఆకులపై పిచికారీ' : 'Foliar Spray' },
-        { label: language === 'te' ? 'ఆశించిన ఫలితం' : 'Gain', value: '+15-20% Yield' },
-      ],
-      description: t.tipContent,
-      speechText: `${t.tipTitle}. ${t.tipContent}`,
-      ctaText: t.tipCta,
-      ctaHref: '/consult',
-    },
-  ];
-
-  const totalSlides = slides.length;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide((prev) => (prev + 1) % totalSlides);
@@ -350,7 +176,7 @@ export function FarmerAdvisoryCarousel() {
     touchEndX.current = null;
   };
 
-  const current = slides[currentSlide];
+  if (!current) return null;
   const IconComponent = current.icon;
 
   return (
@@ -374,7 +200,7 @@ export function FarmerAdvisoryCarousel() {
               {t.sectionTitle}
             </h2>
             <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              {t.slideOf.replace('{current}', String(currentSlide + 1)).replace('{total}', String(totalSlides))}
+              {t.slideOf.replace('{current}', String(safeCurrentIndex + 1)).replace('{total}', String(totalSlides))}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -436,7 +262,7 @@ export function FarmerAdvisoryCarousel() {
                   <span>{current.badge}</span>
                 </span>
                 <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  • {farm?.name || 'Rythu Farm'}
+                  • {user?.name || farm?.name || farmer?.name || 'Rythu Farm'}
                 </span>
               </div>
 
@@ -505,16 +331,42 @@ export function FarmerAdvisoryCarousel() {
             </div>
           </div>
 
-          {/* Bottom Row: CTA Button & Indicators */}
+          {/* Bottom Row: CTA Buttons & Indicators */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-white/10">
-            {/* CTA Navigation Button */}
-            <Link
-              href={current.ctaHref}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all"
-            >
-              <span>{current.ctaText}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              {/* Main CTA: External or Internal Link */}
+              {current.isExternalCta ? (
+                <a
+                  href={current.ctaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all"
+                >
+                  <span>{current.ctaText}</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              ) : (
+                <Link
+                  href={current.ctaHref}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all"
+                >
+                  <span>{current.ctaText}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              )}
+
+              {/* Optional Acknowledge Button for Government Notices */}
+              {current.noticeId && !current.isAcknowledged && (
+                <button
+                  type="button"
+                  onClick={() => current.noticeId && handleAcknowledgeNotice(current.noticeId)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-bold text-slate-200 border border-white/20 transition-all"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t.markAcknowledged}</span>
+                </button>
+              )}
+            </div>
 
             {/* Dots / Pills Indicators */}
             <div className="flex items-center justify-center gap-1.5">
@@ -525,7 +377,7 @@ export function FarmerAdvisoryCarousel() {
                   onClick={() => setCurrentSlide(idx)}
                   aria-label={t.slideOf.replace('{current}', String(idx + 1)).replace('{total}', String(totalSlides))}
                   className={`h-2 rounded-full transition-all duration-300 ${
-                    currentSlide === idx
+                    safeCurrentIndex === idx
                       ? 'w-7 bg-amber-400'
                       : 'w-2 bg-white/30 hover:bg-white/60'
                   }`}
