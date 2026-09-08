@@ -14,9 +14,10 @@ node_modules/
 .venv/
 venv/
 
-# Next.js
+# Next.js & TypeScript
 .next/
 out/
+*.tsbuildinfo
 
 # Logs
 *.log
