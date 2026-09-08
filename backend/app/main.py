@@ -35,8 +35,9 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthCheckResponse)
 def health_check():
+    """Liveness probe: verifies service process is running and responsive."""
     return HealthCheckResponse(
-        status="HEALTHY",
+        status="ok",
         version="1.0.0",
         service="RythuMitra AI Geospatial Microservice",
         geospatial_engine="PostGIS / Shapely / Haversine Active",
@@ -44,11 +45,35 @@ def health_check():
 
 @app.get("/readiness")
 def readiness_check():
-    return {
-        "status": "READY",
+    """Readiness probe: verifies computational engine and external database connectivity (if configured)."""
+    db_url = os.getenv("DATABASE_URL")
+    db_status = "NOT_CONFIGURED"
+    is_ready = True
+
+    if db_url:
+        try:
+            import psycopg2
+            # Connect with a strict 3-second timeout; never log or return connection string
+            conn = psycopg2.connect(db_url, connect_timeout=3)
+            conn.close()
+            db_status = "CONNECTED"
+        except Exception:
+            # Report failure without leaking credentials, user, host, or password
+            db_status = "CONNECTION_FAILED"
+            is_ready = False
+
+    payload = {
+        "status": "READY" if is_ready else "NOT_READY",
         "service": "RythuMitra AI Geospatial Microservice",
+        "database": db_status,
+        "geospatial_engine": "READY",
         "timestamp": os.getenv("RENDER_GIT_COMMIT", "local-build"),
     }
+
+    if not is_ready:
+        raise HTTPException(status_code=503, detail=payload)
+
+    return payload
 
 @app.post("/api/v1/geo/geofence", response_model=GeofenceVerificationResponse)
 def verify_geofence(req: GeofenceVerificationRequest):

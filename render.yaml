@@ -10,8 +10,11 @@ services:
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.8
+        value: 3.11.9
       - key: ENVIRONMENT
         value: production
       - key: FRONTEND_ORIGIN
         sync: false
+      - key: DATABASE_URL
+        sync: false
+

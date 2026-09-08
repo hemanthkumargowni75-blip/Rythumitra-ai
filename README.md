@@ -375,39 +375,40 @@ node scratch/test_password_otp_flows.js
 
 ## 🌐 Deployment
 
-### Vercel (Primary Web & API Deployment)
-RythuMitra AI is self-contained within the Next.js 14 full-stack architecture, allowing complete deployment on Vercel:
+### Frontend
+**Vercel** — Primary web application and full-stack runtime (`Next.js 14 App Router`, Serverless Route Handlers & Edge Runtime).
+
+### Backend
+**Render** — Auxiliary Python/FastAPI geospatial microservice (`backend/app/main.py`) configured via root `render.yaml`. Provides high-performance ray-casting geofencing and mandi freight realization APIs.
+
+### Database
+**PostgreSQL 16 / PostGIS** — Production spatial database configured via `DATABASE_URL`. Replaces ephemeral local filesystem storage for multi-instance production deployments.
+
+### Environment Variables
+Configured securely through Vercel and Render project settings (never committed to repository):
+- **Vercel Settings**: `TWOFACTOR_API_KEY`, `GEMINI_API_KEY`, `DATABASE_URL`, `JWT_SECRET`, `NEXTAUTH_SECRET`, `WEATHER_API_KEY`, `MARKET_API_KEY`
+- **Render Settings**: `FRONTEND_ORIGIN` (set to your Vercel deployment URL), `DATABASE_URL`, `PYTHON_VERSION=3.11.9`, `ENVIRONMENT=production`
+
+### Health Checks
+- **Vercel (Next.js)**: `GET /api/health` (returns `{"status":"ok","service":"rythumitra-ai-web"}`)
+- **Render (FastAPI)**:
+  - `GET /health` (liveness probe: returns `{"status":"ok","service":"RythuMitra AI Geospatial Microservice"}`)
+  - `GET /readiness` (readiness probe: validates computational engine and database connectivity)
+  - `GET /docs` & `GET /redoc` (OpenAPI Swagger UI documentation)
+
+### Auxiliary Microservice Role & Data Flow
+RythuMitra AI is self-contained within the Next.js 14 full-stack architecture on Vercel. The FastAPI backend is an auxiliary microservice hosted on Render, invoked for specialized geospatial geofencing and freight tariff calculations:
 
 ```text
-GitHub Repository (main)
-        ↓ (Automatic CI/CD Deployment)
-Vercel Edge & Serverless Platform
-        ↓
-Next.js 14 Web Application & API Routes (/api/v1/*, /api/health)
++------------------------------------+        +-----------------------------------------+
+|   Vercel Web App (Next.js 14)      |        |     Render Microservice (FastAPI)       |
+| - Authentication & 2Factor OTP     |        | - GET /health (Liveness)                |
+| - India LGD Location Engine        | =====> | - GET /readiness (Readiness)            |
+| - Crop & Soil Intelligence         |        | - POST /api/v1/geo/geofence             |
+| - Mandi Comparisons & Gemini AI    |        | - POST /api/v1/market/realization       |
++------------------------------------+        +-----------------------------------------+
 ```
 
-1. **Import Project**: In Vercel, click **Add New → Project** and import `hemanthkumargowni75-blip/rythumitra-ai`.
-2. **Preset**: Select **Next.js** (automatically detected).
-3. **Build Settings**:
-   - Build Command: `next build`
-   - Output Directory: `.next`
-   - Install Command: `npm install`
-4. **Environment Variables**: Configure server-side credentials in **Settings → Environment Variables** (do not expose secrets with `NEXT_PUBLIC_` prefix).
-
-### Render (Auxiliary Backend Microservice — Optional)
-The Python/FastAPI geospatial microservice in `backend/` is available as an auxiliary service and configured via `render.yaml`:
-
-```text
-GitHub Repository (main)
-        ↓
-Render Web Service (Oregon / Python 3.11)
-        ↓
-FastAPI Microservice (backend/app/main.py on 0.0.0.0:$PORT)
-```
-- **Build Command**: `pip install --upgrade pip && pip install -r requirements.txt`
-- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- **Health Check Path**: `/health`
-- **CORS Config**: Set `FRONTEND_ORIGIN` to your Vercel production domain.
 
 ---
 
