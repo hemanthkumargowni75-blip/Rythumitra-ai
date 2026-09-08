@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  web-dev:
+    image: node:20-alpine
+    container_name: rythumitra-web-dev
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    command: npm run dev
+    networks:
+      - rythumitra-dev-network
+
+  api-dev:
+    image: python:3.11-slim
+    container_name: rythumitra-api-dev
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - RELOAD=true
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - rythumitra-dev-network
+
+networks:
+  rythumitra-dev-network:
+    driver: bridge
