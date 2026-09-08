@@ -17,9 +17,9 @@ services:
       - PORT=3000
       - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
       - FASTAPI_BACKEND_URL=http://api:8000
-      - DATABASE_URL=postgresql://rythu_admin:rythu_secure_pass_2026@postgis:5432/rythumitra_db
-      - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=rythu_mitra_ai_production_jwt_super_secret_key_2026
+      - DATABASE_URL=${DATABASE_URL:-postgresql://rythu_admin:${POSTGRES_PASSWORD:-rythu_dev_password}@postgis:5432/rythumitra_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - JWT_SECRET=${JWT_SECRET:-rythu_dev_jwt_secret_key}
     depends_on:
       api:
         condition: service_healthy
@@ -44,11 +44,11 @@ services:
     environment:
       - ENVIRONMENT=production
       - POSTGRES_SERVER=postgis
-      - POSTGRES_USER=rythu_admin
-      - POSTGRES_PASSWORD=rythu_secure_pass_2026
-      - POSTGRES_DB=rythumitra_db
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=rythu_mitra_ai_production_jwt_super_secret_key_2026
+      - POSTGRES_USER=${POSTGRES_USER:-rythu_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rythu_dev_password}
+      - POSTGRES_DB=${POSTGRES_DB:-rythumitra_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${JWT_SECRET:-rythu_dev_jwt_secret_key}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
@@ -70,15 +70,15 @@ services:
     container_name: rythumitra-postgis
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rythu_admin
-      POSTGRES_PASSWORD: rythu_secure_pass_2026
-      POSTGRES_DB: rythumitra_db
+      POSTGRES_USER: ${POSTGRES_USER:-rythu_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rythu_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rythumitra_db}
     ports:
       - "5432:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rythu_admin -d rythumitra_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rythu_admin} -d ${POSTGRES_DB:-rythumitra_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -92,13 +92,13 @@ services:
     image: redis:7-alpine
     container_name: rythumitra-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass rythu_redis_pass_2026
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-rythu_dev_redis_pass}
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "rythu_redis_pass_2026", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-rythu_dev_redis_pass}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
