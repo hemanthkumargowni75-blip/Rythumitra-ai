@@ -33,6 +33,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { MeeBhoomiCard } from '@/components/MeeBhoomiCard';
 import { GpsLocationCard } from '@/components/GpsLocationCard';
 import { MarketPriceCard } from '@/components/MarketPriceCard';
+import { FarmerAdvisoryCarousel } from '@/components/FarmerAdvisoryCarousel';
 import { getCropTranslations } from '@/data/cropTranslations';
 import { getAllCrops } from '@/data/cropDatabase';
 import { formatINR } from '@/lib/utils';
@@ -295,6 +296,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Farmer Advisory Slides Carousel Section */}
+      <FarmerAdvisoryCarousel />
 
       {/* Live GPS Geolocation & Farm Distance Status */}
       <GpsLocationCard />
