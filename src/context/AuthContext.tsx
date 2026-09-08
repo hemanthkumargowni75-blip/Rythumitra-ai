@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, AuthState, Language } from '@/types';
 import { useRouter } from 'next/navigation';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 interface AuthContextType extends AuthState {
   login: (identifier: string, password: string, language?: Language) => Promise<{ success: boolean; requires2FA?: boolean; error?: string }>;
@@ -96,7 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<{ success: boolean; requires2FA?: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const cleanPhone = identifier.replace(/\D/g, '').slice(-10);
+      const norm = normalizeIndianMobile(identifier);
+      const cleanPhone = norm.valid ? norm.normalized : identifier.replace(/\D/g, '').slice(-10);
 
       const res = await fetch('/api/v1/auth/login/password/request-otp', {
         method: 'POST',
@@ -188,7 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const sendOtp = async (phone: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const norm = normalizeIndianMobile(phone);
+      const cleanPhone = norm.valid ? norm.normalized : phone.replace(/\D/g, '').slice(-10);
       const res = await fetch('/api/v1/auth/login/password/request-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

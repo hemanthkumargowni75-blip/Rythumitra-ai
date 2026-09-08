@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 export type UserRole = 'FARMER' | 'EXPERT' | 'ADMIN' | 'SUPER_ADMIN';
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'PENDING';
@@ -200,7 +201,8 @@ export function persistDatabase(): Promise<void> {
 
 export function getUserByMobile(mobile: string): DbUser | null {
   const db = loadDatabase();
-  const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
+  const norm = normalizeIndianMobile(mobile);
+  const cleanMobile = norm.valid ? norm.normalized : mobile.replace(/\D/g, '').slice(-10);
   return db.users.find((u) => u.mobile_number === cleanMobile) || null;
 }
 
@@ -212,7 +214,8 @@ export function getUserById(userId: string): DbUser | null {
 export function createUser(userData: Omit<DbUser, 'user_id' | 'created_at' | 'updated_at'> & { user_id?: string }): DbUser {
   const db = loadDatabase();
   const now = new Date().toISOString();
-  const cleanMobile = userData.mobile_number.replace(/\D/g, '').slice(-10);
+  const norm = normalizeIndianMobile(userData.mobile_number);
+  const cleanMobile = norm.valid ? norm.normalized : userData.mobile_number.replace(/\D/g, '').slice(-10);
 
   // Check uniqueness
   const existing = db.users.find((u) => u.mobile_number === cleanMobile);
@@ -237,7 +240,7 @@ export function createUser(userData: Omit<DbUser, 'user_id' | 'created_at' | 'up
   };
 
   db.users.push(newUser);
-  persistDatabase();
+  saveDatabaseSync(db);
   return newUser;
 }
 
@@ -260,7 +263,7 @@ export function updateUser(userId: string, updates: Partial<DbUser>): DbUser | n
   }
 
   db.users[idx] = updatedUser;
-  persistDatabase();
+  saveDatabaseSync(db);
   return updatedUser;
 }
 
@@ -345,7 +348,7 @@ export function createSession(userId: string): { sessionToken: string; expiresAt
   };
 
   db.sessions.push(sessionRecord);
-  persistDatabase();
+  saveDatabaseSync(db);
 
   return { sessionToken, expiresAt };
 }
@@ -359,7 +362,7 @@ export function verifySessionToken(token: string): DbUser | null {
   if (!session) return null;
 
   session.last_active_at = now;
-  persistDatabase();
+  saveDatabaseSync(db);
 
   return getUserById(session.user_id);
 }
@@ -367,7 +370,7 @@ export function verifySessionToken(token: string): DbUser | null {
 export function invalidateSessionsForUser(userId: string): void {
   const db = loadDatabase();
   db.sessions = db.sessions.filter((s) => s.user_id !== userId);
-  persistDatabase();
+  saveDatabaseSync(db);
 }
 
 // -----------------------------------------------------------------------------
@@ -382,7 +385,7 @@ export function saveOTPChallenge(challenge: DbOTPChallenge): void {
   } else {
     db.otp_challenges.push(challenge);
   }
-  persistDatabase();
+  saveDatabaseSync(db);
 }
 
 export function getOTPChallenge(challengeId: string): DbOTPChallenge | null {
@@ -395,7 +398,7 @@ export function invalidateOTPChallenge(challengeId: string): void {
   const c = db.otp_challenges.find((item) => item.id === challengeId);
   if (c) {
     c.status = 'EXPIRED';
-    persistDatabase();
+    saveDatabaseSync(db);
   }
 }
 
@@ -410,11 +413,13 @@ export function createPasswordResetToken(userId: string, mobile: string): string
   const now = Date.now();
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const norm = normalizeIndianMobile(mobile);
+  const cleanMobile = norm.valid ? norm.normalized : mobile.replace(/\D/g, '').slice(-10);
 
   const challenge: DbPasswordResetChallenge = {
     id: `rst-${crypto.randomBytes(8).toString('hex')}`,
     user_id: userId,
-    mobile_number: mobile.replace(/\D/g, '').slice(-10),
+    mobile_number: cleanMobile,
     token_hash: tokenHash,
     expires_at: now + RESET_TOKEN_TTL_MS,
     used: false,
@@ -422,7 +427,7 @@ export function createPasswordResetToken(userId: string, mobile: string): string
   };
 
   db.password_reset_challenges.push(challenge);
-  persistDatabase();
+  saveDatabaseSync(db);
 
   return rawToken;
 }
@@ -447,7 +452,7 @@ export function markPasswordResetTokenUsed(rawToken: string): void {
   const challenge = db.password_reset_challenges.find((c) => c.token_hash === tokenHash);
   if (challenge) {
     challenge.used = true;
-    persistDatabase();
+    saveDatabaseSync(db);
   }
 }
 

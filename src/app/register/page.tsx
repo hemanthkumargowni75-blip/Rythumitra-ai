@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { OtpInput } from '@/components/OtpInput';
 import { Language } from '@/types';
 import { AUTH_TRANSLATIONS } from '@/data/authTranslations';
+import { normalizeIndianMobile, cleanInputMobile } from '@/lib/auth/phoneUtils';
 
 interface FieldErrors {
   firstName?: string;
@@ -100,10 +101,11 @@ export default function RegisterPage() {
     }
 
     // 3. Mobile Number: required, valid Indian mobile number, 10 digits starting with 6, 7, 8, or 9
-    if (!cleanPhone) {
+    const norm = normalizeIndianMobile(phone);
+    if (!phone.trim()) {
       errors.phone = 'Mobile Number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      errors.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+    } else if (!norm.valid) {
+      errors.phone = norm.error || 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
     }
 
     // 4. Password: required, minimum 8 characters, letters and numbers
@@ -138,7 +140,8 @@ export default function RegisterPage() {
 
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim();
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const normPhone = normalizeIndianMobile(phone);
+    const cleanPhone = normPhone.valid ? normPhone.normalized : phone.replace(/\D/g, '').slice(-10);
 
     setLoading(true);
 
@@ -225,7 +228,8 @@ export default function RegisterPage() {
     setStatusMessage(null);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const normPhone = normalizeIndianMobile(phone);
+      const cleanPhone = normPhone.valid ? normPhone.normalized : phone.replace(/\D/g, '').slice(-10);
       const res = await fetch('/api/v1/auth/register/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -406,10 +410,10 @@ export default function RegisterPage() {
                     type="tel"
                     id="mobileNumber"
                     name="mobileNumber"
-                    maxLength={10}
+                    maxLength={15}
                     value={phone}
                     onChange={(e) => {
-                      setPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                      setPhone(cleanInputMobile(e.target.value));
                       if (fieldErrors.phone) {
                         setFieldErrors((prev) => ({ ...prev, phone: undefined }));
                       }

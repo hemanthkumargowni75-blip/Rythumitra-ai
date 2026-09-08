@@ -21,6 +21,7 @@ import {
 import { useLanguage } from '@/context/LanguageContext';
 import { OtpInput } from '@/components/OtpInput';
 import { AUTH_TRANSLATIONS } from '@/data/authTranslations';
+import { normalizeIndianMobile, cleanInputMobile } from '@/lib/auth/phoneUtils';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -61,11 +62,12 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setStatusMessage(null);
 
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      setStatusMessage({ type: 'error', text: t.invalidMobile });
+    const norm = normalizeIndianMobile(phone);
+    if (!norm.valid) {
+      setStatusMessage({ type: 'error', text: norm.error || t.invalidMobile });
       return;
     }
+    const cleanPhone = norm.normalized;
 
     setLoading(true);
 
@@ -112,7 +114,8 @@ export default function ForgotPasswordPage() {
     setStatusMessage(null);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const norm = normalizeIndianMobile(phone);
+      const cleanPhone = norm.valid ? norm.normalized : phone.replace(/\D/g, '').slice(-10);
       const res = await fetch('/api/v1/auth/forgot-password/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -266,9 +269,9 @@ export default function ForgotPasswordPage() {
                   <input
                     type="tel"
                     required
-                    maxLength={10}
+                    maxLength={15}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => setPhone(cleanInputMobile(e.target.value))}
                     placeholder="9848022338"
                     className="w-full pl-16 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold tracking-wider text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
                   />

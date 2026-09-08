@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSMSProvider, SMSDeliveryResult } from '@/lib/sms/smsProvider';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 import {
   saveOTPChallenge,
   getOTPChallenge,
@@ -116,15 +117,16 @@ export async function sendSecureOTP(
   cleanupExpiredChallenges();
 
   // Validate phone format (Indian 10-digit mobile)
-  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+  const norm = normalizeIndianMobile(phone);
+  if (!norm.valid) {
     return {
       success: false,
       providerConfigured: false,
       providerName: 'Validation',
-      error: 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.',
+      error: norm.error || 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.',
     };
   }
+  const cleanPhone = norm.normalized;
 
   // Enforce hourly rate limit
   const rateLimit = checkRateLimit(cleanPhone);
@@ -309,7 +311,8 @@ export async function verifySecureOTP(
     };
   }
 
-  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  const norm = normalizeIndianMobile(phone);
+  const cleanPhone = norm.valid ? norm.normalized : phone.replace(/\D/g, '').slice(-10);
   if (challenge.phone !== cleanPhone) {
     return {
       success: false,

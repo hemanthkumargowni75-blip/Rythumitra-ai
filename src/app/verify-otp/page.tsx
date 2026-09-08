@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { OtpInput } from '@/components/OtpInput';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 function VerifyOtpContent() {
   const router = useRouter();
@@ -57,10 +58,11 @@ function VerifyOtpContent() {
     }
 
     if (rawPhone) {
-      const clean = rawPhone.replace(/\D/g, '').slice(-10);
+      const norm = normalizeIndianMobile(rawPhone);
+      const clean = norm.valid ? norm.normalized : rawPhone.replace(/\D/g, '').slice(-10);
       setPhone(clean);
       if (!phoneMasked) {
-        setPhoneMasked(`+91 ${clean.slice(0, 2)}******${clean.slice(-2)}`);
+        setPhoneMasked(norm.valid ? norm.masked : `+91 ${clean.slice(0, 2)}******${clean.slice(-2)}`);
       }
     }
     if (rawChallenge) {
@@ -93,7 +95,8 @@ function VerifyOtpContent() {
     setStatusMessage(null);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const norm = normalizeIndianMobile(phone);
+      const cleanPhone = norm.valid ? norm.normalized : phone.replace(/\D/g, '').slice(-10);
       const res = await fetch('/api/v1/auth/register/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendSecureOTP } from '@/lib/auth/otpService';
 import { validatePassword, hashPassword } from '@/lib/auth/passwordUtils';
 import { getUserByMobile, logAuditEvent } from '@/lib/db/database';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,14 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Validate Mobile Number (Indian mobile format)
-    const rawPhoneStr = typeof rawPhone === 'string' ? rawPhone : '';
-    const cleanPhone = rawPhoneStr.replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    const norm = normalizeIndianMobile(rawPhone);
+    if (!norm.valid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.' },
+        { success: false, error: norm.error || 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.' },
         { status: 400 }
       );
     }
+    const cleanPhone = norm.normalized;
 
     // Check if account already exists
     const existingUser = getUserByMobile(cleanPhone);

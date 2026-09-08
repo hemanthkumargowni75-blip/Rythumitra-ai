@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySecureOTP } from '@/lib/auth/otpService';
 import { getUserById, updateUser, createSession, logAuditEvent } from '@/lib/db/database';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     const rawPhone = mobileNumber || phone || '';
-    const cleanPhone = typeof rawPhone === 'string' ? rawPhone.replace(/\D/g, '').slice(-10) : '';
+    const norm = normalizeIndianMobile(rawPhone);
+    const cleanPhone = norm.valid ? norm.normalized : (typeof rawPhone === 'string' ? rawPhone.replace(/\D/g, '').slice(-10) : '');
     if (!cleanPhone || cleanPhone.length !== 10) {
       return NextResponse.json(
         { success: false, error: 'Valid 10-digit mobile number is required.' },

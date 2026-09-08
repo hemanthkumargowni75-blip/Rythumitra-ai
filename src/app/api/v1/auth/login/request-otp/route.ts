@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSecureOTP } from '@/lib/auth/otpService';
+import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,14 +8,16 @@ export async function POST(request: NextRequest) {
     const { phone } = body || {};
 
     const rawPhone = typeof phone === 'string' ? phone : '';
-    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+    const norm = normalizeIndianMobile(rawPhone);
 
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    if (!norm.valid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.' },
+        { success: false, error: norm.error || 'Invalid Indian mobile number. Must be a 10-digit number starting with 6, 7, 8, or 9.' },
         { status: 400 }
       );
     }
+
+    const cleanPhone = norm.normalized;
 
     const result = await sendSecureOTP(cleanPhone, 'LOGIN');
 
