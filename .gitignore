@@ -54,3 +54,6 @@ __pycache__/
 .pytest_cache/
 
 
+
+.vercel
+.env*
