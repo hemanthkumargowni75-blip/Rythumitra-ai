@@ -22,25 +22,24 @@ export async function POST(request: NextRequest) {
 
     const user = getUserByMobile(cleanPhone);
 
-    // If user does not exist, return a generic message to prevent account enumeration
+    // Verify account exists
     if (!user) {
       logAuditEvent('PASSWORD_RESET_REQUESTED', 'FAILED', {
         mobileNumber: cleanPhone,
         metadata: { reason: 'Account not found' },
       });
 
-      return NextResponse.json({
-        success: true,
-        message: 'If an account is associated with this mobile number, a verification code has been dispatched.',
-        challengeId: `chl_dummy_${Date.now()}`,
-        expiresInSeconds: 300,
-        resendCooldownSeconds: 60,
-        phoneMasked: `+91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No account registered with this mobile number. Please check your mobile number or register.',
+        },
+        { status: 404 }
+      );
     }
 
-    // Issue OTP with purpose FORGOT_PASSWORD
-    const result = await sendSecureOTP(cleanPhone, 'FORGOT_PASSWORD', user.user_id, {
+    // Issue OTP with purpose PASSWORD_RESET
+    const result = await sendSecureOTP(cleanPhone, 'PASSWORD_RESET', user.user_id, {
       userId: user.user_id,
       preferredLanguage: user.preferred_language,
     });
@@ -50,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'OTP service is temporarily unavailable. Please try again later.',
+          error: result.error || 'Unable to send OTP right now. Please try again.',
         },
         { status: statusCode }
       );

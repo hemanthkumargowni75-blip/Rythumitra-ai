@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Strictly enforce FORGOT_PASSWORD purpose
-    const result = await verifySecureOTP(challengeId, cleanPhone, cleanOtp, 'FORGOT_PASSWORD');
+    // Strictly enforce PASSWORD_RESET purpose
+    const result = await verifySecureOTP(challengeId, cleanPhone, cleanOtp, 'PASSWORD_RESET');
 
     if (!result.success) {
       logAuditEvent('PASSWORD_RESET_OTP_VERIFIED', 'FAILED', {

@@ -5,7 +5,7 @@ import { normalizeIndianMobile } from '@/lib/auth/phoneUtils';
 
 export type UserRole = 'FARMER' | 'EXPERT' | 'ADMIN' | 'SUPER_ADMIN';
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'PENDING';
-export type OTPPurpose = 'REGISTER' | 'LOGIN' | 'FORGOT_PASSWORD' | 'CHANGE_PASSWORD' | 'SENSITIVE_ACTION';
+export type OTPPurpose = 'REGISTER' | 'LOGIN' | 'FORGOT_PASSWORD' | 'PASSWORD_RESET' | 'CHANGE_PASSWORD' | 'SENSITIVE_ACTION';
 export type ChallengeStatus = 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'LOCKED';
 
 export interface DbUser {

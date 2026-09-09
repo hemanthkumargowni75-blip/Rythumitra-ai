@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       resendCooldownSeconds: result.resendCooldownSeconds,
       phoneMasked: result.phoneMasked,
       requiresOtp: true,
+      requires2FA: true,
     });
   } catch (error: any) {
     return NextResponse.json(

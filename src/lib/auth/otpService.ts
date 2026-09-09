@@ -75,6 +75,20 @@ function cleanupExpiredChallenges(): void {
 }
 
 /**
+ * Determine if two OTP purposes are equivalent/compatible
+ */
+export function isPurposeCompatible(challengePurpose: OTPPurpose, expectedPurpose: OTPPurpose): boolean {
+  if (challengePurpose === expectedPurpose) return true;
+  if (
+    (challengePurpose === 'PASSWORD_RESET' || challengePurpose === 'FORGOT_PASSWORD') &&
+    (expectedPurpose === 'PASSWORD_RESET' || expectedPurpose === 'FORGOT_PASSWORD')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Check and enforce rate limiting per mobile number
  */
 function checkRateLimit(phone: string): { allowed: boolean; retryAfterSeconds?: number } {
@@ -150,7 +164,7 @@ export async function sendSecureOTP(
   challengeStore.forEach((challenge) => {
     if (
       challenge.phone === cleanPhone &&
-      challenge.purpose === purpose &&
+      isPurposeCompatible(challenge.purpose, purpose) &&
       !challenge.verified
     ) {
       if (now - challenge.createdAt < 10000) {
@@ -340,8 +354,8 @@ export async function verifySecureOTP(
     };
   }
 
-  // Strict Purpose Verification
-  if (expectedPurpose && challenge.purpose !== expectedPurpose) {
+  // Strict Purpose Verification (compatible for PASSWORD_RESET and FORGOT_PASSWORD)
+  if (expectedPurpose && !isPurposeCompatible(challenge.purpose, expectedPurpose)) {
     challengeStore.delete(challengeId);
     saveOTPChallenge({
       id: challengeId,

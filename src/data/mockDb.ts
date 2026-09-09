@@ -15,7 +15,7 @@ export const initialFarmer: FarmerProfile = {
   id: 'farmer-101',
   name: 'Farmer',
   nameTelugu: 'రైతు',
-  phone: '9848022338',
+  phone: '',
   village: 'Tadikonda',
   mandal: 'Tadikonda',
   district: 'Guntur',

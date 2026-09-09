@@ -349,7 +349,7 @@ export default function RegisterPage() {
                           setFieldErrors((prev) => ({ ...prev, firstName: undefined }));
                         }
                       }}
-                      placeholder="e.g. Ramesh"
+                      placeholder={t.firstNamePlaceholder || "First name"}
                       className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:bg-white focus:outline-none transition-colors ${
                         fieldErrors.firstName
                           ? 'border-rose-300 ring-1 ring-rose-300 focus:ring-rose-500'
@@ -380,7 +380,7 @@ export default function RegisterPage() {
                         setFieldErrors((prev) => ({ ...prev, lastName: undefined }));
                       }
                     }}
-                    placeholder="e.g. Rao"
+                    placeholder={t.lastNamePlaceholder || "Last name"}
                     className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:bg-white focus:outline-none transition-colors ${
                       fieldErrors.lastName
                         ? 'border-rose-300 ring-1 ring-rose-300 focus:ring-rose-500'
@@ -410,7 +410,7 @@ export default function RegisterPage() {
                     type="tel"
                     id="mobileNumber"
                     name="mobileNumber"
-                    maxLength={15}
+                    maxLength={16}
                     value={phone}
                     onChange={(e) => {
                       setPhone(cleanInputMobile(e.target.value));
@@ -418,7 +418,7 @@ export default function RegisterPage() {
                         setFieldErrors((prev) => ({ ...prev, phone: undefined }));
                       }
                     }}
-                    placeholder="9848022338"
+                    placeholder={t.mobilePlaceholder || "Enter mobile number"}
                     className={`w-full pl-16 pr-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs sm:text-sm font-bold tracking-wider text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-colors ${
                       fieldErrors.phone
                         ? 'border-rose-300 ring-1 ring-rose-300 focus:ring-rose-500'

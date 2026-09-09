@@ -93,7 +93,7 @@ export default function ForgotPasswordPage() {
       } else {
         setStatusMessage({
           type: 'error',
-          text: data.error || 'Failed to dispatch verification code.',
+          text: data.error || 'Unable to send OTP right now. Please try again.',
         });
       }
     } catch {
@@ -259,7 +259,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleRequestOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {t.mobileNumber} *
+                  {t.mobileNumber}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-500 flex items-center gap-1">
@@ -269,10 +269,10 @@ export default function ForgotPasswordPage() {
                   <input
                     type="tel"
                     required
-                    maxLength={15}
+                    maxLength={16}
                     value={phone}
                     onChange={(e) => setPhone(cleanInputMobile(e.target.value))}
-                    placeholder="9848022338"
+                    placeholder={t.mobilePlaceholder || "Enter mobile number"}
                     className="w-full pl-16 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold tracking-wider text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
                   />
                 </div>
